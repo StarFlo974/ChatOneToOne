@@ -71,6 +71,34 @@ function setUserOnline(id, online) {
   });
 }
 
+function updateUsername(id, username) {
+  return new Promise((resolve, reject) => {
+    const trimmed = (username || "").trim();
+    if (!trimmed) {
+      reject(new Error("username obligatoire"));
+      return;
+    }
+
+    db.run(
+      "UPDATE users SET username = ? WHERE id = ?",
+      [trimmed, id],
+      function (err) {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function getUserById(id) {
+  return new Promise((resolve, reject) => {
+    db.get("SELECT id, username, online FROM users WHERE id = ?", [id], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
 function getUsers() {
   return new Promise((resolve, reject) => {
     db.all("SELECT id, username, online FROM users ORDER BY username", [], (err, rows) => {
@@ -154,6 +182,26 @@ app.post("/api/logout", async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: "logout impossible" });
+  }
+});
+
+app.post("/api/username", async (req, res) => {
+  const id = req.body.userId;
+  const username = (req.body.username || "").trim();
+
+  if (!id || !username) {
+    return res.status(400).json({ error: "userId et username obligatoires" });
+  }
+
+  try {
+    await updateUsername(id, username);
+    const updated = await getUserById(id);
+    res.json(updated);
+  } catch (e) {
+    if (e && e.code === "SQLITE_CONSTRAINT") {
+      return res.status(400).json({ error: "username déjà utilisé" });
+    }
+    res.status(500).json({ error: "erreur mise à jour username" });
   }
 });
 

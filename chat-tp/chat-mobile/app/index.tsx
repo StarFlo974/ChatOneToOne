@@ -7,11 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  SafeAreaView
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
 import * as Location from "expo-location";
+import { loadItem, saveItem } from "./storage";
 
 // const API_URL = "http://10.0.2.2:3000";
 // const API_URL = "http://localhost:3000";
@@ -29,6 +30,8 @@ const palette = {
   bubbleMine: "#1d4ed8",
   bubbleOther: "#1f2937"
 };
+
+type Palette = typeof palette;
 
 type User = {
   id: number;
@@ -50,9 +53,10 @@ type PillButtonProps = {
   onPress: () => void;
   variant?: "primary" | "ghost" | "danger";
   disabled?: boolean;
+  styles: ReturnType<typeof createStyles>;
 };
 
-function PillButton({ title, onPress, variant = "primary", disabled }: PillButtonProps) {
+function PillButton({ title, onPress, variant = "primary", disabled, styles }: PillButtonProps) {
   const variantStyle =
     variant === "primary"
       ? styles.pillPrimary
@@ -80,6 +84,143 @@ function normalizeMessage(m: any): Message {
   };
 }
 
+function createStyles(palette: Palette) {
+  return StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: palette.background },
+    container: { flex: 1 },
+    screenBg: { backgroundColor: palette.background, padding: 14 },
+    topBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    topBarButtons: { flexDirection: "row", gap: 8 },
+    authCard: {
+      backgroundColor: palette.panel,
+      padding: 16,
+      borderRadius: 18,
+      gap: 14,
+      borderWidth: 1,
+      borderColor: palette.border
+    },
+    appTitle: { fontSize: 28, fontWeight: "800", color: palette.accent },
+    subtitle: { color: palette.muted },
+    input: {
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: "#fff",
+      borderWidth: 1,
+      borderColor: palette.border
+    },
+    pillButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    pillPrimary: { backgroundColor: palette.accent },
+    pillGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: palette.border },
+    pillDanger: { backgroundColor: palette.danger },
+    pillDisabled: { opacity: 0.6 },
+    pillText: { color: "#fff", fontWeight: "700" },
+    editNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginVertical: 8
+    },
+    editNameInput: {
+      flex: 1,
+      backgroundColor: palette.card,
+      color: "#fff",
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: palette.border
+    },
+    usersChips: { marginVertical: 10 },
+    usersChipsContent: { gap: 8, paddingRight: 8 },
+    userChip: {
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 14,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      minWidth: 120,
+      marginRight: 8
+    },
+    userChipSelected: {
+      borderColor: palette.accent,
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 }
+    },
+    userRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    userName: { color: "#fff", fontWeight: "600", fontSize: 15 },
+    statusDot: { width: 10, height: 10, borderRadius: 20 },
+    userStatus: { color: palette.muted, fontSize: 12, marginTop: 4 },
+    chatPanel: {
+      flex: 1,
+      backgroundColor: palette.panel,
+      borderRadius: 18,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: palette.border,
+      minHeight: 500
+    },
+    chatHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    },
+    chatTitle: { fontSize: 20, color: "#fff", fontWeight: "700" },
+    chatSubtitle: { color: palette.muted, marginTop: 2 },
+    badge: { color: palette.accent, fontWeight: "600", fontSize: 12 },
+    messagesBox: {
+      flex: 1,
+      backgroundColor: palette.card,
+      borderRadius: 14,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 10
+    },
+    messagesContent: { gap: 8 },
+    messageItem: {
+      padding: 10,
+      borderRadius: 12,
+      maxWidth: "80%",
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 }
+    },
+    messageMine: { backgroundColor: palette.bubbleMine, alignSelf: "flex-end" },
+    messageOther: { backgroundColor: palette.bubbleOther, alignSelf: "flex-start" },
+    messageText: { color: "#fff", fontSize: 14 },
+    messageMeta: { fontSize: 11, color: palette.muted, marginTop: 6, textAlign: "right" },
+    messageImage: { width: 180, height: 180, borderRadius: 12 },
+    inputRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    messageInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: palette.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: palette.card,
+      color: "#fff"
+    },
+    bottomActions: { flexDirection: "row", gap: 8, marginTop: 10 },
+    muted: { color: palette.muted },
+    linkText: { color: palette.accent, fontWeight: "700" },
+  });
+}
+
+
 export default function Index() {
   const [username, setUsername] = useState("");
   const [user, setUser] = useState<User | null>(null);
@@ -88,12 +229,20 @@ export default function Index() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
-
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [playingSound, setPlayingSound] = useState<Audio.Sound | null>(null);
-
   const [editingName, setEditingName] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+
+  const styles = createStyles(palette);
+
+  useEffect(() => {
+    (async () => {
+      const storedUsername = await loadItem<string>("username");
+      if (storedUsername) setUsername(storedUsername);
+    })();
+  }, []);
+
 
   async function login() {
     if (!username.trim()) return;
@@ -107,6 +256,7 @@ export default function Index() {
       if (data && data.id) {
         setUser(data);
         setNewUsername(data.username);
+        await saveItem("username", data.username);
       }
     } catch (e) {
       console.log(e);
@@ -152,9 +302,8 @@ export default function Index() {
       const data = await res.json();
       if (data && data.id) {
         setUser(data);
-        setUsers((prev) =>
-          prev.map((u) => (u.id === data.id ? { ...u, username: data.username } : u))
-        );
+        await saveItem("username", data.username);
+        setUsers((prev) => prev.map((u) => (u.id === data.id ? { ...u, username: data.username } : u)));
         setEditingName(false);
       }
     } catch (e) {
@@ -198,6 +347,20 @@ export default function Index() {
     }
   }
 
+  useEffect(() => {
+    if (user) {
+      loadUsers();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && selectedUser) {
+      loadMessages();
+    } else {
+      setMessages([]);
+    }
+  }, [user, selectedUser]);
+
   async function sendMessage() {
     if (!text.trim() || !user || !selectedUser) return;
     const body = {
@@ -214,7 +377,8 @@ export default function Index() {
       });
       const data = await res.json();
       const m = normalizeMessage(data);
-      setMessages((prev) => [...prev, m]);
+      const updated = [...messages, m];
+      setMessages(updated);
       setText("");
     } catch (e) {
       console.log(e);
@@ -255,7 +419,8 @@ export default function Index() {
       });
       const data = await res.json();
       const m = normalizeMessage(data);
-      setMessages((prev) => [...prev, m]);
+      const updated = [...messages, m];
+      setMessages(updated);
     } catch (e) {
       console.log(e);
     }
@@ -311,7 +476,8 @@ export default function Index() {
       });
       const data = await res.json();
       const m = normalizeMessage(data);
-      setMessages((prev) => [...prev, m]);
+      const updated = [...messages, m];
+      setMessages(updated);
     } catch (e) {
       console.log(e);
     }
@@ -350,7 +516,8 @@ export default function Index() {
       });
       const data = await res.json();
       const m = normalizeMessage(data);
-      setMessages((prev) => [...prev, m]);
+      const updated = [...messages, m];
+      setMessages(updated);
     } catch (e) {
       console.log(e);
     }
@@ -371,18 +538,6 @@ export default function Index() {
     }
   }
 
-  useEffect(() => {
-    if (user) {
-      loadUsers();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user && selectedUser) {
-      loadMessages();
-    }
-  }, [user, selectedUser]);
-
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -397,7 +552,7 @@ export default function Index() {
               value={username}
               onChangeText={setUsername}
             />
-            <PillButton title="Se connecter" onPress={login} />
+            <PillButton title="Se connecter" onPress={login} styles={styles} />
           </View>
         </View>
       </SafeAreaView>
@@ -410,17 +565,9 @@ export default function Index() {
         <View style={styles.topBar}>
           <Text style={styles.appTitle}>EchoChat</Text>
           <View style={styles.topBarButtons}>
-            <PillButton title="Rafraichir" onPress={loadUsers} variant="ghost" />
-            <PillButton
-              title="Modifier pseudo"
-              onPress={startEditUsername}
-              variant="ghost"
-            />
-            <PillButton
-              title="Déconnexion"
-              onPress={logout}
-              variant="danger"
-            />
+            <PillButton title="Rafraichir" onPress={loadUsers} variant="ghost" styles={styles} />
+            <PillButton title="Modifier pseudo" onPress={startEditUsername} variant="ghost" styles={styles} />
+            <PillButton title="Déconnexion" onPress={logout} variant="danger" styles={styles} />
           </View>
         </View>
 
@@ -433,7 +580,7 @@ export default function Index() {
               placeholder="Nouveau pseudo"
               placeholderTextColor={palette.muted}
             />
-            <PillButton title="OK" onPress={saveUsername} />
+            <PillButton title="OK" onPress={saveUsername} styles={styles} />
           </View>
         )}
 
@@ -450,9 +597,7 @@ export default function Index() {
                 key={u.id}
                 style={[
                   styles.userChip,
-                  selectedUser && selectedUser.id === u.id
-                    ? styles.userChipSelected
-                    : null
+                  selectedUser && selectedUser.id === u.id ? styles.userChipSelected : null
                 ]}
                 onPress={() => setSelectedUser(u)}
                 activeOpacity={0.85}
@@ -462,17 +607,11 @@ export default function Index() {
                   <View
                     style={[
                       styles.statusDot,
-                      {
-                        backgroundColor: u.online
-                          ? palette.accent
-                          : palette.danger
-                      }
+                      { backgroundColor: u.online ? palette.accent : palette.danger }
                     ]}
                   />
                 </View>
-                <Text style={styles.userStatus}>
-                  {u.online ? "en ligne" : "hors ligne"}
-                </Text>
+                <Text style={styles.userStatus}>{u.online ? "en ligne" : "hors ligne"}</Text>
               </TouchableOpacity>
             ))}
         </ScrollView>
@@ -498,55 +637,43 @@ export default function Index() {
                 ) : (
                   <ScrollView contentContainerStyle={styles.messagesContent}>
                     {messages.length === 0 ? (
-                      <Text style={styles.muted}>
-                        Aucun message pour le moment.
-                      </Text>
+                      <Text style={styles.muted}>Aucun message pour le moment.</Text>
                     ) : (
                       messages.map((m) => {
                         let contentView = null;
 
                         if (m.type === "image") {
                           contentView = (
-                            <Image
-                              source={{ uri: fileUrl(m.content) }}
-                              style={styles.messageImage}
-                            />
+                            <Image source={{ uri: fileUrl(m.content) }} style={styles.messageImage} />
                           );
                         } else if (m.type === "audio") {
                           contentView = (
-                            <TouchableOpacity
-                              onPress={() => playAudio(fileUrl(m.content))}
-                            >
+                            <TouchableOpacity onPress={() => playAudio(fileUrl(m.content))}>
                               <Text style={styles.linkText}>Lecture audio</Text>
                             </TouchableOpacity>
                           );
                         } else if (m.type === "location") {
-                          let locText = m.content;
-                          try {
-                            const obj = JSON.parse(m.content);
-                            locText =
-                              "Lat: " + obj.lat + " | Lng: " + obj.lng;
-                          } catch (e) {}
+                          const obj = JSON.parse(m.content);
                           contentView = (
-                            <Text style={styles.messageText}>{locText}</Text>
-                          );
-                        } else {
-                          contentView = (
-                            <Text style={styles.messageText}>{m.content}</Text>
-                          );
+                            <Text style={styles.messageText}>
+                              Position: {obj.lat.toFixed(3)}, {obj.lng.toFixed(3)}
+                            </Text>);
                         }
 
+                        const mine = m.senderId === user.id;
                         return (
                           <View
                             key={m.id}
                             style={[
                               styles.messageItem,
-                              m.senderId === user.id
-                                ? styles.messageMine
-                                : styles.messageOther
+                              mine ? styles.messageMine : styles.messageOther
                             ]}
                           >
-                            {contentView}
+                            {contentView || (
+                              <Text style={styles.messageText}>
+                                {m.content}
+                              </Text>
+                            )}
                             <Text style={styles.messageMeta}>
                               {new Date(m.createdAt).toLocaleTimeString()}
                             </Text>
@@ -558,292 +685,33 @@ export default function Index() {
                 )}
               </View>
 
-              <View style={styles.buttonsRow}>
-                <PillButton title="Image" onPress={sendImage} variant="ghost" />
-                <PillButton
-                  title={recording ? "Stop audio" : "Audio"}
-                  onPress={toggleRecording}
-                  variant={recording ? "danger" : "primary"}
-                />
-                <PillButton
-                  title="Position"
-                  onPress={sendLocation}
-                  variant="ghost"
-                />
-              </View>
-
               <View style={styles.inputRow}>
                 <TextInput
                   style={styles.messageInput}
-                  placeholder="Votre message"
+                  placeholder="Message..."
                   placeholderTextColor={palette.muted}
                   value={text}
                   onChangeText={setText}
                 />
+                <PillButton title="Envoyer" onPress={sendMessage} styles={styles} />
+              </View>
+
+              <View style={styles.bottomActions}>
+                <PillButton title="Image" onPress={sendImage} variant="ghost" styles={styles} />
                 <PillButton
-                  title="Envoyer"
-                  onPress={sendMessage}
-                  disabled={!text.trim()}
+                  title={recording ? "Stop" : "Audio"}
+                  onPress={toggleRecording}
+                  variant={recording ? "danger" : "ghost"}
+                  styles={styles}
                 />
+                <PillButton title="Localisation" onPress={sendLocation} variant="ghost" styles={styles} />
               </View>
             </>
           ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.muted}>
-                Sélectionnez un utilisateur pour discuter
-              </Text>
-            </View>
+            <Text style={styles.muted}>Sélectionne un utilisateur pour démarrer le chat.</Text>
           )}
         </View>
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: palette.background
-  },
-  screenBg: {
-    backgroundColor: palette.background
-  },
-  container: {
-    flex: 1,
-    padding: 18
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8
-  },
-  topBarButtons: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  appTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff"
-  },
-  editNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 8
-  },
-  editNameInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.card,
-    color: "#fff",
-    padding: 10,
-    borderRadius: 10
-  },
-  subtitle: {
-    color: palette.muted,
-    marginBottom: 16
-  },
-  titleSmall: {
-    fontSize: 18,
-    color: "#fff",
-    fontWeight: "600"
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.card,
-    color: "#fff",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 14
-  },
-  authCard: {
-    backgroundColor: palette.panel,
-    padding: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
-    gap: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    marginTop: 40
-  },
-  usersChips: {
-    marginBottom: 12
-  },
-  usersChipsContent: {
-    gap: 8,
-    paddingRight: 8
-  },
-  userChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: palette.card,
-    borderWidth: 1,
-    borderColor: palette.border,
-    minWidth: 120,
-    marginRight: 8
-  },
-  userChipSelected: {
-    borderColor: palette.accent,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 }
-  },
-  userRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
-  },
-  userName: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 15
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 20
-  },
-  userStatus: {
-    color: palette.muted,
-    fontSize: 12,
-    marginTop: 4
-  },
-  chatPanel: {
-    flex: 1,
-    backgroundColor: palette.panel,
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: palette.border,
-    minHeight: 500
-  },
-  chatHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12
-  },
-  chatTitle: {
-    fontSize: 20,
-    color: "#fff",
-    fontWeight: "700"
-  },
-  chatSubtitle: {
-    color: palette.muted,
-    marginTop: 2
-  },
-  badge: {
-    color: palette.accent,
-    fontWeight: "600",
-    fontSize: 12
-  },
-  messagesBox: {
-    flex: 1,
-    backgroundColor: palette.card,
-    borderRadius: 14,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    marginBottom: 10
-  },
-  messagesContent: {
-    gap: 8
-  },
-  messageItem: {
-    padding: 10,
-    borderRadius: 12,
-    maxWidth: "80%",
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 }
-  },
-  messageMine: {
-    backgroundColor: palette.bubbleMine,
-    alignSelf: "flex-end"
-  },
-  messageOther: {
-    backgroundColor: palette.bubbleOther,
-    alignSelf: "flex-start"
-  },
-  messageText: {
-    color: "#fff",
-    fontSize: 14
-  },
-  messageMeta: {
-    fontSize: 11,
-    color: palette.muted,
-    marginTop: 6,
-    textAlign: "right"
-  },
-  messageImage: {
-    width: 180,
-    height: 180,
-    borderRadius: 12
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
-  },
-  messageInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.card,
-    color: "#fff",
-    padding: 12,
-    borderRadius: 12
-  },
-  buttonsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 10
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  muted: {
-    color: palette.muted
-  },
-  linkText: {
-    color: palette.accent,
-    textDecorationLine: "underline"
-  },
-  pillButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginLeft: 6
-  },
-  pillText: {
-    color: "#fff",
-    fontWeight: "600",
-    textAlign: "center",
-    fontSize: 12
-  },
-  pillPrimary: {
-    backgroundColor: palette.accent
-  },
-  pillGhost: {
-    backgroundColor: palette.border
-  },
-  pillDanger: {
-    backgroundColor: palette.danger
-  },
-  pillDisabled: {
-    opacity: 0.5
-  }
-});
